@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>규산염 광물 시뮬레이션</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            min-height: 100vh;
+            font-family: 'Malgun Gothic', sans-serif;
+            color: white;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 28px;
+            margin-bottom: 10px;
+            color: #e0e0ff;
+            text-shadow: 0 0 20px rgba(100, 150, 255, 0.8);
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 30px;
+        }
+
+        .reset-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 100, 100, 0.4);
+            z-index: 100;
+            transition: all 0.3s;
+        }
+
+        .reset-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(255, 100, 100, 0.6);
+        }
+
+        .minerals-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 25px;
+            margin-top: 20px;
+        }
+
+        .mineral-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            padding: 20px 15px;
+            text-align: center;
+            width: 160px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+        }
+
+        .mineral-card:hover {
+            border-color: rgba(150, 180, 255, 0.5);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .mineral-name {
+            font-size: 17px;
+            font-weight: bold;
+            margin-bottom: 14px;
+            color: #cce0ff;
+        }
+
+        .mineral-display {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 14px auto;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .mineral-display svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .mineral-display::after {
+            content: '👆 클릭';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            color: rgba(200, 200, 255, 0.5);
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        .mineral-display.clicked::after {
+            display: none;
+        }
+
+        /* ===== 결과 자막 ===== */
+        .result-label {
+            min-height: 36px;
+            font-size: 15px;
+            font-weight: bold;
+            padding: 7px 10px;
+            border-radius: 10px;
+            line-height: 1.5;
+            transition: all 0.5s ease;
+            opacity: 0;
+            transform: translateY(6px);
+            text-align: center;
+        }
+
+        .result-label.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .label-break {
+            background: rgba(255, 80, 80, 0.18);
+            border: 1px solid rgba(255, 80, 80, 0.5);
+            color: #ff9999;
+        }
+
+        .label-cleavage1 {
+            background: rgba(80, 220, 120, 0.18);
+            border: 1px solid rgba(80, 220, 120, 0.5);
+            color: #88ffaa;
+        }
+
+        .label-cleavage2 {
+            background: rgba(80, 160, 255, 0.18);
+            border: 1px solid rgba(80, 160, 255, 0.5);
+            color: #99ccff;
+        }
+
+        /* ===== 애니메이션 ===== */
+        @keyframes flyApart {
+            0%   { transform: translate(0,0) rotate(0deg); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) rotate(var(--tr)); opacity: 0.75; }
+        }
+
+        @keyframes slideCleavage {
+            0%   { transform: translate(0,0); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)); opacity: 0.9; }
+        }
+
+        .fragment {
+            animation: flyApart 0.55s cubic-bezier(0.25,0.46,0.45,0.94) forwards;
+        }
+
+        .cleavage-piece {
+            animation: slideCleavage 0.55s cubic-bezier(0.25,0.46,0.45,0.94) forwards;
+        }
+
+        @keyframes ripple {
+            0%   { transform: translate(-50%,-50%) scale(0); opacity: 0.6; }
+            100% { transform: translate(-50%,-50%) scale(2.5); opacity: 0; }
+        }
+
+        .ripple-effect {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 80px; height: 80px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.25);
+            animation: ripple 0.5s ease-out forwards;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<h1>🪨 규산염 광물 시뮬레이션</h1>
+<p class="subtitle">광물 모형을 클릭하면 깨짐 또는 쪼개짐을 관찰할 수 있어요!</p>
+
+<button class="reset-btn" onclick="resetAll()">🔄 전체 복구</button>
+
+<div class="minerals-container" id="mineralsContainer"></div>
+
+<script>
+const minerals = [
+    { id:'olivine',   name:'감람석', type:'fracture',   color1:'#7ec850', color2:'#4a8a20', shape:'olivine'   },
+    { id:'pyroxene',  name:'휘석',   type:'cleavage2',  color1:'#8B6340', color2:'#5a3c1a', shape:'pyroxene'  },
+    { id:'amphibole', name:'각섬석', type:'cleavage2',  color1:'#505050', color2:'#1e1e1e', shape:'amphibole' },
+    { id:'biotite',   name:'흑운모', type:'cleavage1',  color1:'#4a2e00', color2:'#8a6020', shape:'biotite'   },
+    { id:'quartz',    name:'석영',   type:'fracture',   color1:'#c8e8ff', color2:'#7ab8e8', shape:'quartz'    },
+    { id:'feldspar',  name:'장석',   type:'cleavage2',  color1:'#f0c8a0', color2:'#c88850', shape:'feldspar'  }
+];
+
+/* ── SVG 헬퍼 ── */
+function makeSVG() {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns,'svg');
+    svg.setAttribute('viewBox','0 0 120 120');
+    return svg;
+}
+
+function makeGrad(svg, id, c1, c2) {
+    const ns = 'http://www.w3.org/2000/svg';
+    let defs = svg.querySelector('defs');
+    if (!defs) { defs = document.createElementNS(ns,'defs'); svg.prepend(defs); }
+    const grad = document.createElementNS(ns,'linearGradient');
+    grad.setAttribute('id', id);
+    grad.setAttribute('x1','0%'); grad.setAttribute('y1','0%');
+    grad.setAttribute('x2','100%'); grad.setAttribute('y2','100%');
+    [['0%',c1],['100%',c2]].forEach(([off,col])=>{
+        const s = document.createElementNS(ns,'stop');
+        s.setAttribute('offset',off); s.setAttribute('stop-color',col);
+        grad.appendChild(s);
+    });
+    defs.appendChild(grad);
+    return `url(#${id})`;
+}
+
+function addPath(svg, d, fill, stroke, sw, cls, delay, tx, ty, tr) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const p = document.createElementNS(ns,'path');
+    p.setAttribute('d', d);
+    p.setAttribute('fill', fill);
+    if (stroke) { p.setAttribute('stroke',stroke); p.setAttribute('stroke-width', sw||'1'); }
+    if (cls) {
+        p.classList.add(cls);
+        p.style.setProperty('--tx', tx||'0px');
+        p.style.setProperty('--ty', ty||'0px');
+        if (tr) p.style.setProperty('--tr', tr);
+        if (delay) p.style.animationDelay = delay+'s';
+    }
+    svg.appendChild(p);
+}
+
+function addRect(svg, x, y, w, h, rx, fill, stroke, sw, cls, delay, tx, ty) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const r = document.createElementNS(ns,'rect');
+    r.setAttribute('x',x); r.setAttribute('y',y);
+    r.setAttribute('width',w); r.setAttribute('height',h);
+    if (rx) r.setAttribute('rx',rx);
+    r.setAttribute('fill',fill);
+    if (stroke) { r.setAttribute('stroke',stroke); r.setAttribute('stroke-width',sw||'1'); }
+    if (cls) {
+        r.classList.add(cls);
+        r.style.setProperty('--tx', tx||'0px');
+        r.style.setProperty('--ty', ty||'0px');
+        if (delay !== undefined) r.style.animationDelay = delay+'s';
+    }
+    svg.appendChild(r);
+}
+
+/* ── 온전한 광물 ── */
+function drawIntact(m) {
+    const svg = makeSVG();
+    const fill = makeGrad(svg,'gi_'+m.id, m.color1, m.color2);
+    const paths = {
+        olivine:   'M60 14 L90 34 L95 64 L76 100 L44 100 L25 64 L30 34 Z',
+        pyroxene:  'M50 14 L70 14 L90 40 L90 80 L70 106 L50 106 L30 80 L30 40 Z',
+        amphibole: 'M55 12 L75 12 L96 46 L86 96 L60 110 L34 96 L24 46 Z',
+        biotite:   'M18 44 L102 44 L102 76 L18 76 Z',
+        quartz:    'M60 10 L86 28 L92 60 L80 96 L60 108 L40 96 L28 60 L34 28 Z',
+        feldspar:  'M34 14 L86 14 L96 54 L86 106 L34 106 L24 54 Z'
+    };
+    addPath(svg, paths[m.shape], fill, 'rgba(255,255,255,0.3)', '1.5');
+
+    const ns = 'http://www.w3.org/2000/svg';
+    const shine = document.createElementNS(ns,'ellipse');
+    shine.setAttribute('cx','50'); shine.setAttribute('cy','44');
+    shine.setAttribute('rx','16'); shine.setAttribute('ry','9');
+    shine.setAttribute('fill','rgba(255,255,255,0.18)');
+    shine.setAttribute('transform','rotate(-20,50,44)');
+    svg.appendChild(shine);
+
+    if (m.shape === 'biotite') {
+        for (let y=50; y<76; y+=6) {
+            const ln = document.createElementNS(ns,'line');
+            ln.setAttribute('x1','18'); ln.setAttribute('y1',y);
+            ln.setAttribute('x2','102'); ln.setAttribute('y2',y);
+            ln.setAttribute('stroke','rgba(255,200,100,0.22)');
+            ln.setAttribute('stroke-width','1');
+            svg.appendChild(ln);
+        }
+    }
+    return svg;
+}
+
+/* ── 깨짐 ── */
+function drawFractured(m) {
+    const svg = makeSVG();
+    const fill = makeGrad(svg,'gf_'+m.id, m.color1, m.color2);
+    const pieces = [
+        { d:'M60 60 L28 22 L55 14 L72 36 Z',   tx:'-24px', ty:'-20px', tr:'-28deg' },
+        { d:'M60 60 L72 36 L96 28 L90 64 Z',   tx:'22px',  ty:'-18px', tr:'22deg'  },
+        { d:'M60 60 L90 64 L92 92 L66 102 Z',  tx:'24px',  ty:'20px',  tr:'16deg'  },
+        { d:'M60 60 L66 102 L38 106 L24 82 Z', tx:'-20px', ty:'22px',  tr:'-20deg' },
+        { d:'M60 60 L24 82 L20 48 L28 22 Z',   tx:'-26px', ty:'4px',   tr:'-14deg' },
+    ];
+    pieces.forEach((p,i) => addPath(svg,p.d,fill,'rgba(255,255,255,0.4)','1','fragment',i*0.05,p.tx,p.ty,p.tr));
+
+    const ns = 'http://www.w3.org/2000/svg';
+    ['M60 60 L28 22','M60 60 L96 28','M60 60 L92 92','M60 60 L38 106','M60 60 L20 48'].forEach(d=>{
+        const l = document.createElementNS(ns,'path');
+        l.setAttribute('d',d); l.setAttribute('stroke','rgba(255,220,80,0.7)');
+        l.setAttribute('stroke-width','1.5'); l.setAttribute('fill','none');
+        svg.appendChild(l);
+    });
+    return svg;
+}
+
+/* ── 1방향 쪼개짐 ── */
+function drawCleavage1(m) {
+    const svg = makeSVG();
+    const fill = makeGrad(svg,'gc1_'+m.id, m.color1, m.color2);
+    const layers = [
+        { y:28, h:12, tx:'-10px', ty:'-18px', delay:0.00 },
+        { y:41, h:11, tx: '8px',  ty: '-7px', delay:0.07 },
+        { y:53, h:11, tx:'-6px',  ty:  '5px', delay:0.14 },
+        { y:65, h:13, tx: '9px',  ty: '17px', delay:0.21 },
+    ];
+    const ns = 'http://www.w3.org/2000/svg';
+    layers.forEach(l => {
+        addRect(svg,'18',l.y,'84',l.h,'2',fill,'rgba(255,255,255,0.35)','0.8','cleavage-piece',l.delay,l.tx,l.ty);
+        const shine = document.createElementNS(ns,'rect');
+        shine.setAttribute('x','22'); shine.setAttribute('y',String(l.y+1));
+        shine.setAttribute('width','38'); shine.setAttribute('height','3');
+        shine.setAttribute('rx','1'); shine.setAttribute('fill','rgba(255,255,255,0.22)');
+        svg.appendChild(shine);
+    });
+    return svg;
+}
+
+/* ── 2방향 쪼개짐 ── */
+function drawCleavage2(m) {
+    const svg = makeSVG();
+    const fill = makeGrad(svg,'gc2_'+m.id, m.color1, m.color2);
+    const pieces = [
+        { d:'M28 24 L68 24 L78 52 L38 52 Z',  tx:'-16px', ty:'-16px', delay:0.00 },
+        { d:'M70 24 L88 24 L98 52 L80 52 Z',  tx:'16px',  ty:'-14px', delay:0.06 },
+        { d:'M36 54 L76 54 L86 82 L46 82 Z',  tx:'-12px', ty: '10px', delay:0.12 },
+        { d:'M78 54 L96 54 L100 82 L82 82 Z', tx:'16px',  ty: '14px', delay:0.06 },
+        { d:'M14 26 L26 26 L36 54 L24 54 Z',  tx:'-20px', ty:  '0px', delay:0.18 },
+        { d:'M38 84 L76 84 L70 108 L44 108 Z',tx: '-8px', ty: '18px', delay:0.12 },
+    ];
+    pieces.forEach(p => addPath(svg,p.d,fill,'rgba(255,255,255,0.4)','0.8','cleavage-piece',p.delay,p.tx,p.ty));
+    return svg;
+}
+
+/* ── 자막 정보 (깨짐/쪼개짐만) ── */
+function getLabelInfo(type) {
+    if (type === 'fracture')    return { text:'💥 깨짐',           cls:'label-break'      };
+    if (type === 'cleavage1')   return { text:'📏 쪼개짐 (1방향)', cls:'label-cleavage1'  };
+                                return { text:'✂️ 쪼개짐 (2방향)', cls:'label-cleavage2'  };
+}
+
+/* ── 클릭 처리 ── */
+function activateMineral(m) {
+    const display = document.getElementById('display_'+m.id);
+    if (display.classList.contains('clicked')) return;
+
+    const ripple = document.createElement('div');
+    ripple.className = 'ripple-effect';
+    display.appendChild(ripple);
+    setTimeout(()=>ripple.remove(), 600);
+
+    display.innerHTML = '';
+    display.classList.add('clicked');
+
+    let svg;
+    if      (m.type === 'fracture')   svg = drawFractured(m);
+    else if (m.type === 'cleavage1')  svg = drawCleavage1(m);
+    else                              svg = drawCleavage2(m);
+    display.appendChild(svg);
+
+    const info = getLabelInfo(m.type);
+    const label = document.getElementById('label_'+m.id);
+    label.className = 'result-label ' + info.cls;
+    label.textContent = info.text;
+    setTimeout(()=>label.classList.add('show'), 80);
+}
+
+/* ── 전체 복구 ── */
+function resetAll() {
+    minerals.forEach(m => {
+        const display = document.getElementById('display_'+m.id);
+        display.innerHTML = '';
+        display.classList.remove('clicked');
+        display.appendChild(drawIntact(m));
+
+        const label = document.getElementById('label_'+m.id);
+        label.className = 'result-label';
+        label.textContent = '';
+    });
+}
+
+/* ── 카드 생성 ── */
+function createCard(m) {
+    const card = document.createElement('div');
+    card.className = 'mineral-card';
+
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'mineral-name';
+    nameDiv.textContent = m.name;
+    card.appendChild(nameDiv);
+
+    const display = document.createElement('div');
+    display.className = 'mineral-display';
+    display.id = 'display_'+m.id;
+    display.appendChild(drawIntact(m));
+    display.addEventListener('click', ()=>activateMineral(m));
+    card.appendChild(display);
+
+    const label = document.createElement('div');
+    label.className = 'result-label';
+    label.id = 'label_'+m.id;
+    card.appendChild(label);
+
+    return card;
+}
+
+minerals.forEach(m => document.getElementById('mineralsContainer').appendChild(createCard(m)));
+</script>
+</body>
+</html>
